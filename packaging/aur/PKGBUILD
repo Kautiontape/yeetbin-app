@@ -1,0 +1,38 @@
+# Maintainer: Shawn Squire <shawn@shawnsquire.me>
+pkgname=yeetbin-app
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Yeet a file or stdin at a yeetbin instance and get a shareable link back"
+arch=('x86_64' 'aarch64')
+url="https://github.com/Kautiontape/yeetbin-app"
+license=('MIT')
+depends=('glibc')
+makedepends=('go')
+# Installs /usr/bin/yeet, which the unrelated 'yeet' pacman wrapper also owns.
+conflicts=('yeet')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('68a8858e6b1bac64e51004dac5ad34813ed79111dbfd23bbd127dc1e1924a576')
+
+build() {
+	cd "$pkgname-$pkgver"
+	export CGO_CPPFLAGS="${CPPFLAGS}"
+	export CGO_CFLAGS="${CFLAGS}"
+	export CGO_CXXFLAGS="${CXXFLAGS}"
+	export CGO_LDFLAGS="${LDFLAGS}"
+	export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+	# Stamp the package version into the binary so 'yeet --version' matches pacman.
+	go build -ldflags "-linkmode=external -X main.version=$pkgver" -o yeet .
+}
+
+check() {
+	cd "$pkgname-$pkgver"
+	export GOFLAGS="-trimpath -mod=readonly -modcacherw"
+	go test ./...
+}
+
+package() {
+	cd "$pkgname-$pkgver"
+	install -Dm755 yeet "$pkgdir/usr/bin/yeet"
+	install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+	install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
