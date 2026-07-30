@@ -1,3 +1,3 @@
-module github.com/shawnsquire/yeet
+module github.com/Kautiontape/yeetbin-app
 
 go 1.26.5

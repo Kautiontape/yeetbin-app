@@ -1,6 +1,7 @@
-# yeet
+# yeetbin-app
 
-Throw a file at [yeetbin](https://yeet.kautiontape.com) and get a link back.
+Throw a file at [yeetbin](https://yeet.kautiontape.com) and get a link back. The command is
+`yeet`.
 
 ```console
 $ yeet notes.md
@@ -12,9 +13,28 @@ no runtime dependencies.
 
 ## Install
 
+Arch Linux, from the AUR:
+
+```sh
+yay -S yeetbin-app
+```
+
+With Go:
+
+```sh
+go install github.com/Kautiontape/yeetbin-app@latest
+```
+
+From a checkout:
+
 ```sh
 go build -trimpath -ldflags="-s -w" -o ~/.local/bin/yeet .
 ```
+
+> [!note]
+> The package installs `/usr/bin/yeet`, which collides with the unrelated
+> [`yeet`](https://aur.archlinux.org/packages/yeet) pacman wrapper in the AUR. The two
+> cannot be installed side by side, so `yeetbin-app` declares a conflict.
 
 ## Usage
 

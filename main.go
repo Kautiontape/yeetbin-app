@@ -14,8 +14,12 @@ import (
 	"time"
 )
 
+// version is overridable at link time so packaging can stamp in the release version:
+//
+//	go build -ldflags "-X main.version=1.2.3"
+var version = "0.1.0"
+
 const (
-	version        = "0.1.0"
 	defaultBaseURL = "https://yeet.kautiontape.com"
 	requestTimeout = 30 * time.Second
 )
