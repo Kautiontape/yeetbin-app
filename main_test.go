@@ -13,8 +13,7 @@ import (
 	"time"
 )
 
-// harness wires run() to a stub server and replaces every function that would touch the
-// real terminal or a browser. Originals are restored on cleanup.
+// Wires run() to a stub server and stubs out terminal/browser access.
 type harness struct {
 	srv      *httptest.Server
 	requests [][]byte
@@ -259,8 +258,7 @@ func TestRunSucceedsEvenIfBrowserFailsToLaunch(t *testing.T) {
 	stdoutIsTTY = func() bool { return true }
 	openInBrowser = func(string) error { return fmt.Errorf("no display") }
 
-	// The upload already succeeded and the URL is already printed, so a browser
-	// failure must not turn into a non-zero exit.
+	// A browser failure must not turn a successful upload into a non-zero exit.
 	if code := h.run(nil, "content\n"); code != 0 {
 		t.Errorf("exit = %d, want 0 despite the browser failing", code)
 	}

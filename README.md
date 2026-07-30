@@ -13,11 +13,16 @@ no runtime dependencies.
 
 ## Install
 
-Arch Linux, from the AUR:
+Arch Linux, from the [ktn] repo:
 
 ```sh
-yay -S yeetbin-app
+sudo pacman -S yeetbin-app
 ```
+
+The package is built and published by
+[Kautiontape/ktn-repo](https://github.com/Kautiontape/ktn-repo), which holds the PKGBUILD.
+It installs `/usr/bin/yeet` and conflicts with the unrelated
+[`yeet`](https://aur.archlinux.org/packages/yeet) pacman wrapper.
 
 With Go:
 
@@ -30,11 +35,6 @@ From a checkout:
 ```sh
 go build -trimpath -ldflags="-s -w" -o ~/.local/bin/yeet .
 ```
-
-> [!note]
-> The package installs `/usr/bin/yeet`, which collides with the unrelated
-> [`yeet`](https://aur.archlinux.org/packages/yeet) pacman wrapper in the AUR. The two
-> cannot be installed side by side, so `yeetbin-app` declares a conflict.
 
 ## Usage
 
@@ -97,4 +97,5 @@ Tests never touch the network or open a browser: `client_test.go` and `main_test
 against `httptest` servers, and the four functions in `terminal.go` that touch the terminal
 or launch a browser are variables the tests replace.
 
-The design lives in [`docs/superpowers/specs`](docs/superpowers/specs/).
+The design lives in [`docs/superpowers/specs`](docs/superpowers/specs/). Packaging lives in
+[Kautiontape/ktn-repo](https://github.com/Kautiontape/ktn-repo).

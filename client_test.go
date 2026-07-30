@@ -158,8 +158,7 @@ func TestCreateSurfacesServerErrorMessage(t *testing.T) {
 }
 
 func TestCreateHandlesNonJSONErrorBody(t *testing.T) {
-	// A proxy failure returns HTML, not JSON. This must not produce a parse panic
-	// or an inscrutable error.
+	// A proxy failure returns HTML, not JSON.
 	srv := stubServer(t, http.StatusBadGateway,
 		"<html><head><title>502 Bad Gateway</title></head><body>nginx</body></html>")
 

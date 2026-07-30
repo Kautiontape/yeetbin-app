@@ -9,9 +9,7 @@ import (
 	"strings"
 )
 
-// These are the only functions that touch the terminal or launch a browser. They are
-// variables so that tests can substitute them; nothing else in the program does I/O
-// beyond reading the input file and talking to the server.
+// Variables so tests can substitute them.
 var (
 	openInBrowser = openInBrowserReal
 	stdoutIsTTY   = func() bool { return isTerminal(os.Stdout) }
@@ -27,7 +25,6 @@ func isTerminal(f *os.File) bool {
 	return info.Mode()&os.ModeCharDevice != 0
 }
 
-// openInBrowserReal launches the system browser without waiting for it to exit.
 func openInBrowserReal(url string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
@@ -38,19 +35,16 @@ func openInBrowserReal(url string) error {
 	default:
 		cmd = exec.Command("xdg-open", url)
 	}
-	// Detach from our stdio so a chatty launcher cannot pollute the URL on stdout.
+	// Detached so a chatty launcher cannot pollute stdout.
 	cmd.Stdout, cmd.Stderr, cmd.Stdin = nil, nil, nil
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	// Reap the child in the background rather than leaving a zombie.
-	go cmd.Wait()
+	go cmd.Wait() // reap
 	return nil
 }
 
-// readPasswordReal reads a line from the terminal with echo disabled. Go's standard
-// library has no no-echo read, so this drives stty and restores the previous terminal
-// state afterwards.
+// Drives stty because the stdlib has no no-echo read.
 func readPasswordReal(prompt string) (string, error) {
 	tty, err := os.Open("/dev/tty")
 	if err != nil {
@@ -66,8 +60,6 @@ func readPasswordReal(prompt string) (string, error) {
 		return "", err
 	}
 	defer func() {
-		// Restore the exact prior state, and drop a newline since the user's Enter
-		// was never echoed.
 		stty(tty, saved)
 		fmt.Fprintln(os.Stderr)
 	}()

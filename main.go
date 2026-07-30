@@ -14,9 +14,7 @@ import (
 	"time"
 )
 
-// version is overridable at link time so packaging can stamp in the release version:
-//
-//	go build -ldflags "-X main.version=1.2.3"
+// Stamped by packaging via -ldflags "-X main.version=...".
 var version = "0.1.0"
 
 const (
@@ -24,7 +22,6 @@ const (
 	requestTimeout = 30 * time.Second
 )
 
-// Exit codes.
 const (
 	exitOK    = 0
 	exitError = 1
@@ -65,7 +62,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	)
 
 	if err := fs.Parse(args); err != nil {
-		// Parse already reported the problem. An explicit -help is not an error.
 		if errors.Is(err, flag.ErrHelp) {
 			return exitOK
 		}
@@ -77,7 +73,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitOK
 	}
 
-	// Resolve the input source.
 	rest := fs.Args()
 	if len(rest) > 1 {
 		fmt.Fprintf(stderr, "yeet: expected at most one file, got %d\n", len(rest))
@@ -90,7 +85,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		filename = rest[0]
 	}
 
-	// A bare `yeet` with nothing piped in would block on stdin forever. Show usage.
+	// A bare `yeet` would otherwise block on stdin forever.
 	if filename == "" && stdinIsTTY() {
 		fmt.Fprint(stderr, usageText)
 		fs.PrintDefaults()
@@ -103,7 +98,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	)
 	if filename == "" || filename == "-" {
 		data, err = io.ReadAll(io.LimitReader(stdin, maxContentBytes+1))
-		filename = "" // stdin has no extension to detect from
+		filename = "" // no extension to detect from
 	} else {
 		data, err = os.ReadFile(filename)
 	}
@@ -117,7 +112,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
-	// Detection first, then flag overrides.
 	contentType, language := detectType(filename)
 	if *langFlag != "" {
 		contentType, language = typeCode, *langFlag
@@ -130,7 +124,6 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		contentType = *typeFlag
 	}
-	// language is only meaningful for code bins.
 	if contentType != typeCode {
 		language = ""
 	}
@@ -177,13 +170,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitError
 	}
 
-	// The URL goes to stdout unconditionally so it can be piped.
+	// Unconditional so the URL can be piped.
 	fmt.Fprintln(stdout, url)
 
-	// Only open a browser for an interactive run; piping should stay quiet.
 	if !*noOpenFlag && stdoutIsTTY() {
 		if err := openInBrowser(url); err != nil {
-			// The upload succeeded and the URL is printed, so this is only a warning.
+			// The upload already succeeded, so this is only a warning.
 			fmt.Fprintf(stderr, "yeet: could not open a browser: %v\n", err)
 		}
 	}
