@@ -1,5 +1,5 @@
-// Command yeet uploads a file or stdin to a yeetbin instance and prints the resulting
-// shareable URL.
+// Command yeet sends a file or stdin to a yeetbin instance, either the public server or
+// the local yeetbin browser extension, and prints the resulting URL.
 package main
 
 import (
@@ -9,13 +9,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 )
 
 // Stamped by packaging via -ldflags "-X main.version=...".
-var version = "0.1.0"
+var version = "0.2.0"
 
 const (
 	defaultBaseURL = "https://yeet.kautiontape.com"
@@ -30,16 +31,27 @@ const (
 
 const usageText = `usage: yeet [flags] [file]
 
-Uploads a file, or stdin when no file is given, and prints the shareable URL.
+Yeets a file, or stdin when no file is given, and prints the URL. Once the local
+yeetbin extension is installed, yeets stay in your browser unless you pass --public.
 
-  yeet notes.md              upload a file
-  cat notes.md | yeet        upload stdin
-  yeet - < notes.md          upload stdin explicitly
+  yeet notes.md              yeet a file
+  cat notes.md | yeet        yeet stdin
+  yeet - < notes.md          yeet stdin explicitly
+  yeet --public notes.md     upload to the public instance for a shareable link
+
+environment:
+  YEET_TARGET     auto (default), local or public
+  YEET_URL        public instance (default https://yeet.kautiontape.com)
+  YEET_PASSWORD   password for --password, skipping the prompt
 
 flags:
 `
 
 func main() {
+	// A browser launches its native messaging host with the caller's origin as argv[1].
+	if len(os.Args) > 1 && strings.HasPrefix(os.Args[1], "chrome-extension://") {
+		os.Exit(runNativeHost(os.Stdin, os.Stdout, os.Stderr, socketPath()))
+	}
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
@@ -58,6 +70,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		burnFlag   = fs.Bool("burn", false, "delete the bin after it is viewed once")
 		passFlag   = fs.Bool("password", false, "protect the bin with a password (prompts, or reads YEET_PASSWORD)")
 		noOpenFlag = fs.Bool("no-open", false, "never open a browser")
+		localFlag  = fs.Bool("local", false, "keep it in the local yeetbin extension; fails if it isn't running")
+		publicFlag = fs.Bool("public", false, "upload to the public instance even when local is installed")
+		installArg = fs.Bool("install-native-host", false, "register yeet with your browsers so the local yeetbin extension can reach it")
+		removeArg  = fs.Bool("uninstall-native-host", false, "remove that registration")
 		versionArg = fs.Bool("version", false, "print the version and exit")
 	)
 
@@ -71,6 +87,39 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if *versionArg {
 		fmt.Fprintf(stdout, "yeet %s\n", version)
 		return exitOK
+	}
+	if *installArg && *removeArg {
+		fmt.Fprintln(stderr, "yeet: --install-native-host and --uninstall-native-host are mutually exclusive")
+		return exitUsage
+	}
+	if *installArg {
+		return installNativeHost(stdout, stderr)
+	}
+	if *removeArg {
+		return uninstallNativeHost(stdout, stderr)
+	}
+
+	target, err := resolveTarget(*localFlag, *publicFlag, os.Getenv("YEET_TARGET"), localInstalled)
+	if err != nil {
+		fmt.Fprintf(stderr, "yeet: %v\n", err)
+		return exitUsage
+	}
+	if target == targetLocal {
+		var publicOnly []string
+		if *burnFlag {
+			publicOnly = append(publicOnly, "--burn")
+		}
+		if *expireFlag != "" {
+			publicOnly = append(publicOnly, "--expire")
+		}
+		if *passFlag {
+			publicOnly = append(publicOnly, "--password")
+		}
+		if len(publicOnly) > 0 {
+			fmt.Fprintf(stderr, "yeet: %s only applies to public yeets; add --public\n",
+				strings.Join(publicOnly, ", "))
+			return exitUsage
+		}
 	}
 
 	rest := fs.Args()
@@ -92,10 +141,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitUsage
 	}
 
-	var (
-		data []byte
-		err  error
-	)
+	var data []byte
 	if filename == "" || filename == "-" {
 		data, err = io.ReadAll(io.LimitReader(stdin, maxContentBytes+1))
 		filename = "" // no extension to detect from
@@ -126,6 +172,27 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if contentType != typeCode {
 		language = ""
+	}
+
+	if target == targetLocal {
+		title := ""
+		if filename != "" {
+			title = filepath.Base(filename)
+		}
+		url, err := sendLocal(socketPath(), localRequest{
+			Content:  string(data),
+			Type:     contentType,
+			Language: language,
+			Title:    title,
+			// xdg-open cannot open chrome-extension:// URLs, so the extension opens the tab.
+			Open: !*noOpenFlag && stdoutIsTTY(),
+		})
+		if err != nil {
+			fmt.Fprintf(stderr, "yeet: %v\n", err)
+			return exitError
+		}
+		fmt.Fprintln(stdout, url)
+		return exitOK
 	}
 
 	req := binRequest{

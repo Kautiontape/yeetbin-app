@@ -18,6 +18,7 @@ type harness struct {
 	srv      *httptest.Server
 	requests [][]byte
 	opened   []string
+	socket   string
 	stdout   bytes.Buffer
 	stderr   bytes.Buffer
 }
@@ -37,11 +38,18 @@ func newHarness(t *testing.T, status int, respBody string) *harness {
 
 	t.Setenv("YEET_URL", h.srv.URL)
 	t.Setenv("YEET_PASSWORD", "")
+	// Isolate from this machine: no installed native host, no running one.
+	t.Setenv("YEET_TARGET", "")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	h.socket = filepath.Join(shortTempDir(t), "local.sock")
 
 	origOpen, origStdoutTTY, origStdinTTY, origPass := openInBrowser, stdoutIsTTY, stdinIsTTY, readPassword
+	origSocket := socketPath
 	t.Cleanup(func() {
 		openInBrowser, stdoutIsTTY, stdinIsTTY, readPassword = origOpen, origStdoutTTY, origStdinTTY, origPass
+		socketPath = origSocket
 	})
+	socketPath = func() string { return h.socket }
 
 	openInBrowser = func(url string) error { h.opened = append(h.opened, url); return nil }
 	stdoutIsTTY = func() bool { return false }
