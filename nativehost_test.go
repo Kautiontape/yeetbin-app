@@ -382,12 +382,14 @@ func TestNativeHostTakesOverStaleSocket(t *testing.T) {
 	}
 	stale.SetUnlinkOnClose(false)
 	stale.Close()
-	staleInfo, err := os.Stat(path)
-	if err != nil {
+	if _, err := os.Stat(path); err != nil {
 		t.Fatal(err)
 	}
 
-	rig := startHost(t, path, staleInfo)
+	// No identity check against the stale file: once it is unlinked, ext4 hands its
+	// inode straight to the new socket, so os.SameFile can't tell them apart. The stale
+	// file refuses connections, so a successful dial already means the new host is up.
+	rig := startHost(t, path, nil)
 
 	result := sendAsync(path, localRequest{Content: "x", Type: "text"})
 	head, _ := rig.read(t)
